@@ -1,0 +1,23 @@
+# Version control
+.git
+.gitignore
+
+# Documentation
+README.md
+LICENSE
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
