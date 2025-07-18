@@ -159,8 +159,6 @@ docker compose exec nginx bash
 
 ## License
 
-This project is licensed under the ISC License. See the LICENSE file for details.
-
 ## Future Enhancements
 
 - Authentication and authorization
