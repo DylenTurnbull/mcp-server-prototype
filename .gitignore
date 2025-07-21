@@ -73,3 +73,8 @@ Thumbs.db
 # Build output
 build/
 dist/
+
+# Testing
+test-jsonrpc.js
+test-mcp.js
+test-result.*
