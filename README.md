@@ -1,169 +1,361 @@
-# MCP Server Prototype
+# NGINX MCP Server
 
-A Model Context Protocol (MCP) server designed to interact with and monitor NGINX instances. This project demonstrates how to build an MCP server that provides tools and resources for NGINX management through a containerized architecture.
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
+
+A **Model Context Protocol (MCP)** server that provides AI assistants with tools for monitoring and managing NGINX instances. Built with the official MCP SDK and fully tested with Claude Desktop for production use.
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standard that enables AI systems to securely connect to data sources and tools. This server implements MCP to allow AI assistants like Claude to interact with NGINX servers through a standardized interface.
 
 ## Features
 
-- **NGINX Status Monitoring**: Get real-time status information from NGINX
-- **Configuration Access**: Retrieve NGINX configuration through MCP resources
-- **Health Checks**: Built-in health monitoring for both services
-- **Containerized**: Fully dockerized setup with Docker Compose
-- **MCP Compliant**: Built using the official Model Context Protocol SDK
-
-## Architecture
-
-The project consists of two main services:
-- **MCP Server**: Node.js application implementing the MCP protocol
-- **NGINX**: Web server with status endpoint and configuration exposure
-
-Both services run in Docker containers and communicate over a dedicated network.
-
-## Prerequisites
-
-- Docker and Docker Compose
-- Node.js 18+ (for local development)
+- **🔍 Real-time Monitoring**: Live NGINX status and connection metrics
+- **📄 Configuration Access**: Retrieve and analyze NGINX config files  
+- **⚡ Health Checks**: Built-in connectivity testing with timestamps
+- **🛠️ MCP Compliant**: Built with official SDK v1.15.1, tested with Claude Desktop
+- **🐳 Containerized**: Complete Docker setup with NGINX instance
+- **💡 Smart Error Handling**: Graceful fallbacks and helpful suggestions
+- **🎯 Production Ready**: Clean, tested, and fully functional
 
 ## Quick Start
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/DylenTurnbull/mcp-server-prototype.git
-   cd mcp-server-prototype
-   ```
+### 1. Clone and Setup
 
-2. **Start the services**
-   ```bash
-   docker compose up --build
-   ```
-
-3. **Verify the setup**
-   - MCP Server health check: http://localhost:8000/health
-   - NGINX status: http://localhost:8080/status
-
-## Available MCP Tools
-
-### `get_nginx_status`
-Retrieves the current status of the NGINX server.
-
-**Parameters:**
-- `endpoint` (optional): Status endpoint URL (default: http://nginx:8080/status)
-
-**Example Response:**
+```bash
+git clone https://github.com/DylenTurnbull/mcp-server-prototype.git
+cd mcp-server-prototype
+npm install
 ```
+
+### 2. Start NGINX Server
+
+```bash
+docker compose up nginx -d
+```
+
+### 3. Configure Claude Desktop
+
+Copy the configuration to Claude Desktop:
+
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "nginx-mcp-server": {
+      "command": "node",
+      "args": ["./src/index.js"],
+      "cwd": "<FULL_PATH_TO_PROJECT>"
+    }
+  }
+}
+```
+
+**Important Notes:**
+- Replace `<FULL_PATH_TO_PROJECT>` with your actual project directory path
+- Use relative path `./src/index.js` in the `args` field for better portability
+- Example Windows path: `"C:\\Users\\YourName\\Documents\\mcp-server-prototype"`
+- Example Unix path: `"/home/username/projects/mcp-server-prototype"`
+
+### 4. Restart Claude Desktop
+
+Close and reopen Claude Desktop to load the MCP server.
+
+## MCP Tools
+
+The server provides these tools for AI assistants:
+
+| Tool | Description | Purpose |
+|------|-------------|---------|
+| `nginx_connectivity_test` | Test connectivity to NGINX server and get status with timestamps | Connection verification with detailed metrics |
+| `nginx_simple_status` | Get raw NGINX server status metrics and connection data | Live server statistics and activity |  
+| `nginx_server_info` | Get NGINX server configuration details, environment info, and available operations | Server setup and operational information |
+| `nginx_get_config` | Read and display the complete NGINX configuration file content | Configuration analysis and debugging |
+
+## MCP Resources
+
+- **`nginx://config`**: NGINX configuration file content (text/plain) - accessible as a resource
+
+## Using with Claude Desktop
+
+Once configured, you can interact with your NGINX server through Claude using natural language:
+
+### 🔍 **Discovery Commands**
+```
+What NGINX tools do you have available?
+List all available NGINX monitoring capabilities
+```
+
+### ⚡ **Basic Monitoring**
+```
+Test NGINX connectivity
+Check NGINX status
+Get current NGINX metrics
+Show me the server health
+```
+
+### 📊 **Detailed Analysis**
+```
+Get NGINX server information
+Show me the NGINX configuration
+Analyze the NGINX setup
+Check server configuration details
+```
+
+### 🧪 **Advanced Usage**
+```
+Check NGINX health and analyze the configuration
+Monitor NGINX status and tell me about any issues
+Get complete server information including metrics and config
+Test connectivity and show me detailed server information
+```
+
+### 📝 **Expected Responses**
+
+**Connectivity Test:**
+```
+✅ NGINX connectivity test successful!
+
+📊 Status: HTTP 200
+📝 Response:
 Active connections: 1 
 server accepts handled requests
- 1 1 1 
+ 22 22 22
 Reading: 0 Writing: 1 Waiting: 0
+
+🕐 Timestamp: 2025-07-27T15:30:45.123Z
 ```
 
-### `reload_nginx`
-Simulates an NGINX reload operation.
+**Server Information:**
+```
+📋 NGINX Server Information:
 
-**Note**: In this prototype, this provides a simulated response. In production, this would trigger an actual reload.
+🌐 Service URL: http://localhost:8080
+📂 Status Endpoint: /status
+📄 Config Endpoint: /nginx_conf
+🐳 Container: nginx (Docker)
+⚡ Port: 8080
+📦 Environment: Docker Compose
+🔧 Image: nginx:latest
 
-### `test_nginx_connectivity`
-Tests connectivity to the NGINX server to ensure it's responsive.
+🛠️ Available MCP Tools:
+- nginx_connectivity_test: Test server connectivity
+- nginx_simple_status: Get raw status metrics
+- nginx_get_config: Read configuration file
+- nginx_server_info: This server information
 
-## Available MCP Resources
+💡 Note: This shows server setup info, not live metrics.
+```
 
-### `nginx://config`
-Exposes the NGINX configuration file content.
+## Project Structure
 
-**URI**: `nginx://config`
+```
+mcp-server-prototype/
+├── src/
+│   └── index.js                  # Main MCP server implementation
+├── claude-desktop-config.json    # Claude Desktop integration config
+├── docker-compose.yml            # NGINX service orchestration  
+├── nginx.conf                    # NGINX server configuration
+├── package.json                  # Node.js dependencies and scripts
+├── Dockerfile                    # Container build configuration
+└── README.md                     # This documentation
+```
 
 ## Development
 
-### Local Development
+### Available Scripts
+
+- `npm start` - Run MCP server in production mode
+- `npm run dev` - Run with file watching for development
+
+### Local Development Setup
+
 ```bash
 # Install dependencies
 npm install
 
-# Run in development mode (with file watching)
-npm run dev
+# Start NGINX only (for development)
+docker compose up nginx -d
 
-# Run normally
-npm start
+# Run MCP server with auto-reload
+npm run dev
 ```
 
-### Docker Development
+### Testing the MCP Server
+
 ```bash
-# Build and run with Docker Compose
-docker compose up --build
+# Check syntax
+node --check src/index.js
 
-# Run in detached mode
-docker compose up -d
+# Test NGINX connectivity
+curl http://localhost:8080/status
 
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
+# Verify container status
+docker compose ps
 ```
 
 ## Configuration
 
 ### Environment Variables
-Currently, the application uses default configurations. You can extend this by adding environment variables to the docker-compose.yml file.
 
-### NGINX Configuration
-The NGINX configuration is mounted from `./nginx.conf`. Key endpoints:
-- `/status`: Provides server status information
-- `/nginx_conf`: Returns configuration content
+The MCP server supports configuration through environment variables:
 
-## Health Checks
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NGINX_HOST` | `localhost` | NGINX server hostname or IP address |
+| `NGINX_PORT` | `8080` | NGINX server port number |
+| `NODE_ENV` | - | Node.js environment (development/production) |
 
-Both services include health checks:
-- **MCP Server**: HTTP check on `/health` endpoint
-- **NGINX**: HTTP check on `/status` endpoint
+### Configuration File
 
-Health check status can be viewed with:
+Copy `.env.example` to `.env` and modify as needed:
+
 ```bash
-docker compose ps
+cp .env.example .env
 ```
 
-## API Documentation
+Example `.env` file:
+```env
+NGINX_HOST=localhost
+NGINX_PORT=8080
+NODE_ENV=production
+```
 
-The MCP server implements the Model Context Protocol specification. It provides:
-- **Tools**: Executable functions for NGINX management
-- **Resources**: Read-only access to NGINX configuration and status
+### Custom NGINX Configuration
+
+To monitor a different NGINX instance:
+1. Update environment variables or `.env` file
+2. Ensure the target NGINX has status endpoint enabled
+3. Restart Claude Desktop to reload the MCP server
+
+## Architecture
+
+```
+┌─────────────────┐    JSON-RPC/MCP    ┌─────────────────┐
+│   Claude        │◄─────────────────►│   MCP Server    │
+│   Desktop       │      stdio        │   (Node.js)     │  
+└─────────────────┘                   └─────────┬───────┘
+                                                │ HTTP
+                                      ┌─────────▼───────┐
+                                      │   NGINX Server  │
+                                      │   (Docker)      │
+                                      └─────────────────┘
+```
+
+## Configuration
+
+### NGINX Endpoints
+
+- `http://localhost:8080/status` - Server status metrics (restricted access)
+- `http://localhost:8080/` - Default page / health check
+
+### Security Notes
+
+- NGINX status endpoint restricted to localhost and Docker networks
+- No authentication required (development/testing use)
+- File access limited to project directory with multiple fallback paths
+
+### Customization
+
+To modify the NGINX configuration:
+
+1. Edit `nginx.conf`
+2. Restart the container: `docker compose restart nginx`
+3. Test changes with Claude: "Test NGINX connectivity"
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Port conflicts**: Ensure ports 8000 and 8080 are available
-2. **Container communication**: Check that both containers are on the same network
-3. **Health check failures**: Verify endpoints are accessible within containers
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| **Port conflict** | `docker compose up` fails | Change port in `docker-compose.yml` or stop conflicting service |
+| **MCP tools not found** | Claude doesn't see tools | Verify `cwd` path in Claude Desktop config matches your project location |
+| **Config file not found** | Tools report config errors | Ensure MCP server runs from project directory |
+| **Connection refused** | Connectivity tests fail | Start NGINX: `docker compose up nginx -d` |
+| **Claude doesn't respond** | No tool execution | Restart Claude Desktop after config changes |
 
-### Debugging
+### Debug Commands
+
 ```bash
-# Check container logs
-docker compose logs mcp-server
+# Verify NGINX is running
+docker compose ps
+curl http://localhost:8080/status
+
+# Check NGINX logs
 docker compose logs nginx
 
-# Check container status
+# Test MCP server startup
+node src/index.js
+# (Should show: ✅ NGINX Tools MCP Server started successfully)
+
+# View containers
 docker compose ps
 
-# Execute commands inside containers
-docker compose exec mcp-server bash
-docker compose exec nginx bash
+# Stop/restart services
+docker compose down
+docker compose up nginx -d
 ```
+
+## Advanced Usage
+
+### Multiple NGINX Instances
+
+To monitor multiple NGINX servers, modify the tools in `src/index.js` to accept hostname parameters or create multiple MCP server instances.
+
+### Custom Tools
+
+Add new tools by registering them in `src/index.js`:
+
+```javascript
+server.registerTool('custom_tool', {
+  description: 'Description of your custom tool',
+}, async () => {
+  // Your implementation
+  return {
+    content: [{ type: 'text', text: 'Tool response' }]
+  };
+});
+```
+
+## Technical Notes
+
+### MCP Implementation Details
+
+- **Transport**: stdio (Standard Input/Output)
+- **Protocol**: JSON-RPC 2.0 over MCP
+- **SDK Version**: @modelcontextprotocol/sdk ^1.15.1
+- **Compatibility**: Tested with Claude Desktop v0.12.55+
+
+### Known Limitations
+
+- Avoids `inputSchema` in tool definitions (causes validation issues)
+- Single NGINX instance monitoring (can be extended)
+- Windows path handling with multiple fallbacks
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Add tests if applicable
+4. Test with Claude Desktop
 5. Submit a pull request
 
 ## License
 
-## Future Enhancements
+ISC License - see [LICENSE](LICENSE) file.
 
-- Authentication and authorization
-- Real NGINX reload functionality
-- Configuration validation
-- Metrics collection
-- Support for multiple NGINX instances
-- WebSocket support for real-time monitoring
+## Resources
+
+- [Model Context Protocol Specification](https://modelcontextprotocol.io/)
+- [MCP SDK on GitHub](https://github.com/modelcontextprotocol/sdk)
+- [Claude Desktop Download](https://claude.ai/desktop)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+
+---
+
+**🎉 Ready to monitor NGINX with AI assistance!**

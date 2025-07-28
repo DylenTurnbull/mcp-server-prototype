@@ -2,22 +2,40 @@
 .git
 .gitignore
 
-# Documentation
-README.md
+# Documentation (keep README.md as it might be needed)
 LICENSE
 
-# Docker files
+# Docker files (exclude these from the container)
 Dockerfile
 docker-compose.yml
 .dockerignore
 
-# IDE
+# IDE and development tools
 .vscode
 .idea
+.vs
+
+# Node.js dependencies (will be installed in container)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Logs
 *.log
+logs/
+
+# Environment variables (security)
+.env
+.env.*
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Test files and development artifacts
+test-*.js
+test-result.*
+
+# GitHub specific
+.github/

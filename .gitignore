@@ -78,3 +78,13 @@ dist/
 test-jsonrpc.js
 test-mcp.js
 test-result.*
+
+# MCP development files (if any alternative test files exist)
+test-*.js
+validate-*.js
+
+# Claude Desktop config with potentially sensitive paths
+claude-desktop-config.json
+
+# VS specific (Windows)
+.vs/
