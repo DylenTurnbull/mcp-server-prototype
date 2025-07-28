@@ -17,14 +17,27 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with tools
 ## Quick Setup
 
 ### Prerequisites
-- Node.js 18+
-- Docker Desktop
-- Claude Desktop
+- [Node.js 18+](https://nodejs.org/en/download/) - Download and install the latest LTS version
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) - Required for running the NGINX container
+- [Claude Desktop](https://claude.ai/download) - The AI assistant that will use this MCP server
 
 ### Installation
+
+**Option 1: Download Manually**
+1. Go to the [repository page](https://github.com/DylenTurnbull/mcp-server-prototype)
+2. Click the green "Code" button, then "Download ZIP"
+3. Extract the ZIP file to your desired location
+4. Open a terminal/command prompt in the extracted folder
+
+**Option 2: Using Git**
+If you have Git installed, you can clone the repository:
 ```bash
 git clone https://github.com/DylenTurnbull/mcp-server-prototype.git
 cd mcp-server-prototype
+```
+
+**Install Dependencies**
+```bash
 npm install
 ```
 
@@ -33,19 +46,41 @@ npm install
 docker compose up nginx -d
 ```
 
-### Configure Claude Desktop
-Add to your Claude Desktop config file:
+## ⚠️ **CRITICAL: Claude Desktop Configuration**
 
-**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`  
-**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+This step is **essential** for the MCP tools to work. Follow these instructions carefully:
 
+### Step 1: Locate Claude Desktop Config File
+
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`  
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+
+### Step 2: Create/Edit Configuration
+
+**⚠️ IMPORTANT:** Both `args` and `cwd` MUST use **full absolute paths**. Relative paths will NOT work.
+
+#### Windows Example:
 ```json
 {
   "mcpServers": {
     "nginx-mcp-server": {
       "command": "node",
-      "args": ["./src/index.js"],
-      "cwd": "<FULL_PATH_TO_PROJECT>"
+      "args": ["C:\\Users\\YourUsername\\Documents\\source\\mcp-server-prototype\\src\\index.js"],
+      "cwd": "C:\\Users\\YourUsername\\Documents\\source\\mcp-server-prototype"
+    }
+  }
+}
+```
+
+#### macOS/Linux Example:
+```json
+{
+  "mcpServers": {
+    "nginx-mcp-server": {
+      "command": "node",
+      "args": ["/full/path/to/your/project/src/index.js"],
+      "cwd": "/full/path/to/your/project"
     }
   }
 }
@@ -53,9 +88,34 @@ Add to your Claude Desktop config file:
 
 Replace `<FULL_PATH_TO_PROJECT>` with your actual project directory path.
 
+
+1. **Completely close Claude Desktop**
+2. **Wait 10 seconds**
+2. **Restart Claude Desktop**  
+
+### ❌ Common Configuration Mistakes
+
+| ❌ Wrong | ✅ Correct |
+|----------|------------|
+| `"args": "./src/index.js"` | `"args": ["C:\\full\\path\\src\\index.js"]` |
+| `"cwd": "."` | `"cwd": "C:\\full\\path\\to\\project"` |
+| `"C:\path\file.js"` | `"C:\\path\\file.js"` |
+| Relative paths | Full absolute paths |
+
 ### Test Integration
-1. Restart Claude Desktop
-2. Ask Claude: "What NGINX tools do you have available?"
+1. Ask Claude: "What NGINX tools do you have available?"
+
+## Manual Setup Steps
+
+If you prefer to set everything up step by step:
+
+1. **Install Prerequisites**: Make sure you have Node.js, Docker Desktop, and Claude Desktop installed
+2. **Download the Project**: Get the code using one of the installation methods above
+3. **Install Dependencies**: Run `npm install` in the project directory
+4. **Start NGINX**: Run `docker compose up nginx -d` to start the NGINX container
+5. **Configure Claude**: Add the MCP server configuration to your Claude Desktop config file
+6. **Restart Claude**: Close and reopen Claude Desktop to load the new MCP server
+7. **Test**: Ask Claude about available NGINX tools to verify everything works
 
 ## Available Tools
 
@@ -68,12 +128,36 @@ Replace `<FULL_PATH_TO_PROJECT>` with your actual project directory path.
 
 ## Usage Examples
 
-Ask Claude Desktop:
+Once everything is set up, you can ask Claude natural questions about your NGINX server. Here are some examples you can copy and paste:
+
+**Check if NGINX is running:**
 ```
-Test NGINX connectivity
-Check NGINX status  
-Show me the NGINX configuration
-Get server information
+Is my NGINX server running and healthy?
+```
+
+**Get server performance metrics:**
+```
+Show me the current NGINX status and connection statistics
+```
+
+**View configuration details:**
+```
+Can you show me my NGINX configuration file?
+```
+
+**Get detailed server information:**
+```
+What can you tell me about my NGINX server setup and environment?
+```
+
+**Test connectivity with timestamps:**
+```
+Test the connectivity to my NGINX server and show me when it was last checked
+```
+
+**Troubleshoot connection issues:**
+```
+Help me diagnose why I can't connect to my NGINX server
 ```
 
 ## Configuration
@@ -86,11 +170,6 @@ NGINX_HOST=localhost
 NGINX_PORT=8080
 NODE_ENV=production
 ```
-
-### Monitor Different NGINX Instances
-1. Update `.env` with custom `NGINX_HOST` and `NGINX_PORT`
-2. Ensure target NGINX has `/status` endpoint enabled
-3. Restart Claude Desktop
 
 ## Troubleshooting
 
@@ -134,10 +213,6 @@ mcp-server-prototype/
 
 ## Resources
 
+- [Anthrop/c](https://www.anthropic.com/)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
-- [MCP SDK](https://github.com/modelcontextprotocol/sdk)
-- [Claude Desktop](https://claude.ai/desktop)
-
-## License
-
-ISC License - see [LICENSE](LICENSE) file.
+- [MCP SDKs](https://modelcontextprotocol.io/docs/sdk#sdks)
