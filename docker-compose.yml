@@ -1,6 +1,7 @@
 services:
   nginx:
     image: nginx:latest
+    container_name: nginx-server
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -11,3 +12,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    restart: unless-stopped
+
+# Note: The MCP server should run on the host machine, not in a container,
+# because it needs to communicate with Claude Desktop via stdio transport.
+# To run the MCP server: npm start or node src/index.js
