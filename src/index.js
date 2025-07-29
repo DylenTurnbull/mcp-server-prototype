@@ -19,7 +19,7 @@ server.registerResource('nginx://config', {
   mimeType: 'text/plain',
 }, async () => {
   try {
-    const response = await axios.get(`${NGINX_BASE_URL}/nginx-config`, { timeout: 5000 });
+    const response = await axios.get(`${NGINX_BASE_URL}/nginx_conf`, { timeout: 5000 });
     return {
       contents: [
         {
