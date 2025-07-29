@@ -119,7 +119,7 @@ server.registerTool('nginx_get_config', {
   description: 'Read and display the complete NGINX configuration file content',
 }, async () => {
   try {
-    // First try to get config from NGINX web endpoint
+    // Try to get config from NGINX web endpoint
     const response = await axios.get(`${NGINX_BASE_URL}/nginx_conf`, { timeout: 5000 });
     return {
       content: [
@@ -129,60 +129,15 @@ server.registerTool('nginx_get_config', {
         },
       ],
     };
-  } catch (webError) {
-    // Fallback to reading local file
-    try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      
-      const possiblePaths = [
-        path.join(process.cwd(), 'nginx.conf'),
-        path.join(process.cwd(), '..', 'nginx.conf'),
-        path.resolve('./nginx.conf'),
-      ];
-      
-      let configContent = null;
-      let usedPath = null;
-      
-      for (const configPath of possiblePaths) {
-        try {
-          configContent = await fs.readFile(configPath, 'utf8');
-          usedPath = configPath;
-          break;
-        } catch (error) {
-          continue;
-        }
-      }
-      
-      if (configContent) {
-        return {
-          content: [
-            { 
-              type: 'text', 
-              text: `📄 NGINX Configuration File (from local file):\n📂 Path: ${usedPath}\n\n\`\`\`nginx\n${configContent}\n\`\`\``
-            },
-          ],
-        };
-      } else {
-        return {
-          content: [
-            { 
-              type: 'text', 
-              text: `❌ Cannot read NGINX configuration\n\n🌐 Web endpoint error: ${webError.message}\n\n🔍 Searched local file locations:\n${possiblePaths.map(p => `- ${p}`).join('\n')}\n\n💡 Suggestions:\n- Ensure nginx.conf exists in the project directory\n- Check that the MCP server is running from the correct directory\n- Verify NGINX container is running: docker compose ps\n- Current working directory: ${process.cwd()}`
-            },
-          ],
-        };
-      }
-    } catch (fileError) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `❌ Error reading NGINX configuration\n\n🌐 Web endpoint error: ${webError.message}\n📁 File read error: ${fileError.message}\n\n💡 Current working directory: ${process.cwd()}\n\nSuggestions:\n- Ensure NGINX container is running: docker compose ps\n- Check if nginx.conf exists in the project directory\n- Verify file permissions\n- Test web endpoint: curl ${NGINX_BASE_URL}/nginx_conf`
-          },
-        ],
-      };
-    }
+  } catch (error) {
+    return {
+      content: [
+        { 
+          type: 'text', 
+          text: `❌ Unable to retrieve real NGINX configuration\n\n� Error: ${error.message}\n\n⚠️ This tool can only access the actual running NGINX server configuration through the web endpoint. Local file fallbacks have been disabled to ensure data authenticity.\n\n💡 Troubleshooting:\n- Ensure NGINX container is running: docker compose ps\n- Check NGINX service status: docker compose logs nginx\n- Verify web endpoint: curl ${NGINX_BASE_URL}/nginx_conf\n- Confirm container port mapping: docker compose port nginx 8080\n\n🔧 To fix:\n1. Start NGINX: docker compose up nginx -d\n2. Wait for container to be healthy\n3. Try this tool again`
+        },
+      ],
+    };
   }
 });
 
