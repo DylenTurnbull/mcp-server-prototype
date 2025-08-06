@@ -45,6 +45,64 @@ npm install
 docker compose up nginx -d
 ```
 
+## Configuration
+
+The server uses a hierarchical configuration system with multiple sources:
+
+### 1. Configuration Setup
+**First, create your local configuration file:**
+
+```bash
+# Copy the example configuration and customize it
+cp config.json.example config.json
+
+# Edit config.json with your specific paths
+# The file is in .gitignore so your local paths stay private
+```
+
+### 2. Configuration File (`config.json`)
+Your local configuration file (not committed to git):
+
+```json
+{
+  "nginx": {
+    "host": "localhost",
+    "port": "8080"
+  },
+  "project": {
+    "directory": "/your/actual/path/to/mcp-server-prototype"
+  },
+  "server": {
+    "name": "NGINX Tools",
+    "version": "1.0.0"
+  },
+  "timeouts": {
+    "httpRequest": 5000
+  }
+}
+```
+
+### 3. Environment Variables (Override config.json)
+Create a `.env` file or set environment variables to override config file values:
+
+```bash
+# Copy .env.example to .env and modify as needed
+cp .env.example .env
+```
+
+Available environment variables:
+- `NGINX_HOST` - NGINX server hostname
+- `NGINX_PORT` - NGINX server port  
+- `PROJECT_DIR` - Project directory path
+- `SERVER_NAME` - MCP server name
+- `SERVER_VERSION` - MCP server version
+- `HTTP_TIMEOUT` - HTTP request timeout (ms)
+
+### 4. Configuration Priority
+Environment variables > config.json (local) > defaults
+
+**Note**: `config.json` is in `.gitignore` - your local paths stay private!
+
 ## ⚠️ **CRITICAL: Claude Desktop Configuration**
 
 This step is **essential** for the MCP tools to work. Follow these instructions carefully:
