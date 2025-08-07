@@ -86,5 +86,8 @@ validate-*.js
 # Claude Desktop config with potentially sensitive paths
 claude-desktop-config.json
 
+# Local configuration with system-specific paths
+config.json
+
 # VS specific (Windows)
 .vs/

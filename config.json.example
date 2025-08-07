@@ -1,0 +1,16 @@
+{
+  "nginx": {
+    "host": "localhost",
+    "port": "8080"
+  },
+  "project": {
+    "directory": "/path/to/your/mcp-server-prototype"
+  },
+  "server": {
+    "name": "NGINX Tools",
+    "version": "1.0.0"
+  },
+  "timeouts": {
+    "httpRequest": 5000
+  }
+}

@@ -10,6 +10,9 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with tools
 - **🔍 Real-time Monitoring**: Live NGINX status and connection metrics
 - **📄 Configuration Access**: Retrieve and analyze NGINX config files  
 - **⚡ Health Checks**: Built-in connectivity testing with timestamps
+- **🚀 Runtime Control**: Start, stop, reload, and manage NGINX containers
+- **🔧 Configuration Management**: Test and reload NGINX configs without restart
+- **⚙️ External Configuration**: JSON config file with environment variable overrides
 - **🛠️ MCP Compliant**: Built with official SDK v1.15.1
 - **🐳 Containerized**: Complete Docker setup with NGINX instance
 
@@ -40,10 +43,77 @@ cd mcp-server-prototype
 npm install
 ```
 
+**Setup Configuration**
+```bash
+# Copy the example configuration and customize it
+cp config.json.example config.json
+
+# Edit config.json with your specific project path
+# (The file is in .gitignore so your local paths stay private)
+```
+
 ### Start NGINX Server
 ```bash
 docker compose up nginx -d
 ```
+
+## Configuration
+
+The server uses a hierarchical configuration system with multiple sources:
+
+### 1. Configuration Setup
+**First, create your local configuration file:**
+
+```bash
+# Copy the example configuration and customize it
+cp config.json.example config.json
+
+# Edit config.json with your specific paths
+# The file is in .gitignore so your local paths stay private
+```
+
+### 2. Configuration File (`config.json`)
+Your local configuration file (not committed to git):
+
+```json
+{
+  "nginx": {
+    "host": "localhost",
+    "port": "8080"
+  },
+  "project": {
+    "directory": "/your/actual/path/to/mcp-server-prototype"
+  },
+  "server": {
+    "name": "NGINX Tools",
+    "version": "1.0.0"
+  },
+  "timeouts": {
+    "httpRequest": 5000
+  }
+}
+```
+
+### 3. Environment Variables (Override config.json)
+Create a `.env` file or set environment variables to override config file values:
+
+```bash
+# Copy .env.example to .env and modify as needed
+cp .env.example .env
+```
+
+Available environment variables:
+- `NGINX_HOST` - NGINX server hostname
+- `NGINX_PORT` - NGINX server port  
+- `PROJECT_DIR` - Project directory path
+- `SERVER_NAME` - MCP server name
+- `SERVER_VERSION` - MCP server version
+- `HTTP_TIMEOUT` - HTTP request timeout (ms)
+
+### 4. Configuration Priority
+Environment variables > config.json (local) > defaults
+
+**Note**: `config.json` is in `.gitignore` - your local paths stay private!
 
 ## ⚠️ **CRITICAL: Claude Desktop Configuration**
 
@@ -118,6 +188,7 @@ If you prefer to set everything up step by step:
 
 ## Available Tools
 
+### Monitoring Tools
 | Tool | Description |
 |------|-------------|
 | `nginx_connectivity_test` | Test connectivity and get status with timestamps |
@@ -125,10 +196,21 @@ If you prefer to set everything up step by step:
 | `nginx_server_info` | Get server configuration and environment info |
 | `nginx_get_config` | Read the complete NGINX configuration file |
 
+### Runtime Control Tools
+| Tool | Description |
+|------|-------------|
+| `nginx_start` | Start the NGINX container |
+| `nginx_stop` | Stop the NGINX container |
+| `nginx_reload` | Reload NGINX configuration without restart |
+| `nginx_test_config` | Test NGINX configuration syntax |
+| `nginx_quit` | Quit NGINX process gracefully (waits for connections) |
+| `nginx_version` | Get NGINX version and configuration details |
+
 ## Usage Examples
 
 Once everything is set up, you can ask Claude natural questions about your NGINX server. Here are some examples you can copy and paste:
 
+### Monitoring Examples
 **Check if NGINX is running:**
 ```
 Is my NGINX server running and healthy?
@@ -149,35 +231,47 @@ Can you show me my NGINX configuration file?
 What can you tell me about my NGINX server setup and environment?
 ```
 
-**Test connectivity with timestamps:**
+### Runtime Control Examples
+**Start NGINX container:**
 ```
-Test the connectivity to my NGINX server and show me when it was last checked
-```
-
-**Troubleshoot connection issues:**
-```
-Help me diagnose why I can't connect to my NGINX server
+Start my NGINX container
 ```
 
-## Configuration
+**Stop NGINX container:**
+```
+Stop my NGINX container
+```
 
-### Environment Variables
-Create a `.env` file to customize settings:
+**Reload configuration:**
+```
+Reload my NGINX configuration after I made changes
+```
 
-```env
-NGINX_HOST=localhost
-NGINX_PORT=8080
-NODE_ENV=production
+**Test configuration:**
+```
+Test my NGINX configuration for syntax errors before reloading
+```
+
+**Get version information:**
+```
+What version of NGINX is running?
+```
+
+**Graceful shutdown:**
+```
+Gracefully stop NGINX and wait for active connections to finish
 ```
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Port conflict | Change port in `docker-compose.yml` |
+| `config.json` missing | Copy from template: `cp config.json.example config.json` |
+| Port conflict | Change port in `config.json` or set `NGINX_PORT` env var |
 | MCP tools not found | Verify `cwd` path in Claude config |
-| Connection refused | Start NGINX: `docker compose up nginx -d` |
+| Connection refused | Start NGINX: Ask Claude to "start NGINX" or `docker compose up nginx -d` |
 | Claude doesn't respond | Restart Claude Desktop |
+| Runtime commands fail | Check Docker is running and containers exist |
 
 ### Debug Commands
 ```bash
@@ -187,6 +281,9 @@ curl http://localhost:8080/status
 
 # Test MCP server
 node --check src/index.js
+
+# Check configuration
+cat config.json
 ```
 
 ## Development
@@ -203,7 +300,10 @@ npm start
 
 ```
 mcp-server-prototype/
-├── src/index.js              # Main MCP server
+├── src/index.js              # Main MCP server with runtime controls
+├── config.json.example       # Configuration template (safe for git)
+├── config.json               # Local configuration (ignored by git)
+├── .env.example              # Environment variables template
 ├── nginx.conf                # NGINX configuration
 ├── docker-compose.yml        # Docker setup
 ├── claude-desktop-config.json # Claude integration
