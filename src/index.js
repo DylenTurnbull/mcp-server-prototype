@@ -7,13 +7,10 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the directory of the current module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load configuration from external file
 const configPath = join(__dirname, '..', 'config.json');
-const configExamplePath = join(__dirname, '..', 'config.json.example');
 let config;
 try {
   config = JSON.parse(readFileSync(configPath, 'utf8'));
@@ -29,20 +26,53 @@ try {
   process.exit(1);
 }
 
-// Configuration from config file with environment variable overrides
 const NGINX_HOST = process.env.NGINX_HOST || config.nginx.host;
 const NGINX_PORT = process.env.NGINX_PORT || config.nginx.port;
 const NGINX_BASE_URL = `http://${NGINX_HOST}:${NGINX_PORT}`;
 
-// Project directory for Docker Compose operations
 const PROJECT_DIR = process.env.PROJECT_DIR || config.project.directory;
 
-// Server configuration
 const SERVER_NAME = process.env.SERVER_NAME || config.server.name;
 const SERVER_VERSION = process.env.SERVER_VERSION || config.server.version;
 
-// Timeout configuration
 const HTTP_TIMEOUT = process.env.HTTP_TIMEOUT || config.timeouts.httpRequest;
+
+async function executeDockerCommand(args, options = {}) {
+  const { spawn } = await import('child_process');
+  
+  return new Promise((resolve, reject) => {
+    const childProcess = spawn('docker', args, {
+      cwd: PROJECT_DIR,
+      stdio: 'pipe',
+      ...options
+    });
+    
+    let stdout = '';
+    let stderr = '';
+    
+    childProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    childProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    childProcess.on('close', (code) => {
+      resolve({ stdout, stderr, code });
+    });
+    
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
+function formatResponse(text) {
+  return {
+    content: [{ type: 'text', text }]
+  };
+}
 
 const server = new McpServer({
   name: SERVER_NAME,
@@ -154,7 +184,6 @@ server.registerTool('nginx_get_config', {
   description: 'Read and display the complete NGINX configuration file content',
 }, async () => {
   try {
-    // Try to get config from NGINX web endpoint
     const response = await axios.get(`${NGINX_BASE_URL}/nginx_conf`, { timeout: HTTP_TIMEOUT });
     return {
       content: [
@@ -180,49 +209,20 @@ server.registerTool('nginx_reload', {
   description: 'Reload NGINX configuration by executing nginx -s reload inside the container',
 }, async () => {
   try {
-    const { spawn } = await import('child_process');
-    const { promisify } = await import('util');
-    const execFile = promisify(spawn);
+    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-s', 'reload']);
     
-    // Execute docker compose exec nginx nginx -s reload
-    const result = await new Promise((resolve, reject) => {
-      const childProcess = spawn('docker', ['compose', 'exec', '-T', 'nginx', 'nginx', '-s', 'reload'], {
-        cwd: PROJECT_DIR,
-        stdio: 'pipe'
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve({ stdout, stderr, code });
-        } else {
-          reject(new Error(`Command failed with code ${code}: ${stderr}`));
-        }
-      });
-      
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
-    
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `✅ NGINX configuration reloaded successfully!\n\n📝 Command: docker compose exec nginx nginx -s reload\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stdout || 'No output (normal for successful reload)'}\n${result.stderr ? `\n⚠️ Stderr: ${result.stderr}` : ''}`
-        },
-      ],
-    };
+    if (result.code === 0) {
+      return {
+        content: [
+          { 
+            type: 'text', 
+            text: `✅ NGINX configuration reloaded successfully!\n\n📝 Command: docker compose exec nginx nginx -s reload\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stdout || 'No output (normal for successful reload)'}\n${result.stderr ? `\n⚠️ Stderr: ${result.stderr}` : ''}`
+          },
+        ],
+      };
+    } else {
+      throw new Error(`Command failed with code ${result.code}: ${result.stderr}`);
+    }
   } catch (error) {
     return {
       content: [
@@ -239,34 +239,7 @@ server.registerTool('nginx_test_config', {
   description: 'Test NGINX configuration syntax by executing nginx -t inside the container',
 }, async () => {
   try {
-    const { spawn } = await import('child_process');
-    
-    // Execute docker compose exec nginx nginx -t
-    const result = await new Promise((resolve, reject) => {
-      const childProcess = spawn('docker', ['compose', 'exec', '-T', 'nginx', 'nginx', '-t'], {
-        cwd: PROJECT_DIR,
-        stdio: 'pipe'
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      childProcess.on('close', (code) => {
-        resolve({ stdout, stderr, code });
-      });
-      
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
+    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-t']);
     
     if (result.code === 0) {
       return {
@@ -303,34 +276,7 @@ server.registerTool('nginx_stop', {
   description: 'Stop the NGINX container using Docker Compose',
 }, async () => {
   try {
-    const { spawn } = await import('child_process');
-    
-    // Execute docker compose stop nginx
-    const result = await new Promise((resolve, reject) => {
-      const childProcess = spawn('docker', ['compose', 'stop', 'nginx'], {
-        cwd: PROJECT_DIR,
-        stdio: 'pipe'
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      childProcess.on('close', (code) => {
-        resolve({ stdout, stderr, code });
-      });
-      
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
+    const result = await executeDockerCommand(['compose', 'stop', 'nginx']);
     
     if (result.code === 0) {
       return {
@@ -367,34 +313,7 @@ server.registerTool('nginx_quit', {
   description: 'Quit NGINX gracefully by executing nginx -s quit inside the container (waits for active connections to finish)',
 }, async () => {
   try {
-    const { spawn } = await import('child_process');
-    
-    // Execute docker compose exec nginx nginx -s quit
-    const result = await new Promise((resolve, reject) => {
-      const childProcess = spawn('docker', ['compose', 'exec', '-T', 'nginx', 'nginx', '-s', 'quit'], {
-        cwd: PROJECT_DIR,
-        stdio: 'pipe'
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      childProcess.on('close', (code) => {
-        resolve({ stdout, stderr, code });
-      });
-      
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
+    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-s', 'quit']);
     
     if (result.code === 0) {
       return {
@@ -431,34 +350,7 @@ server.registerTool('nginx_start', {
   description: 'Start the NGINX container using Docker Compose',
 }, async () => {
   try {
-    const { spawn } = await import('child_process');
-    
-    // Execute docker compose up nginx -d
-    const result = await new Promise((resolve, reject) => {
-      const childProcess = spawn('docker', ['compose', 'up', 'nginx', '-d'], {
-        cwd: PROJECT_DIR,
-        stdio: 'pipe'
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      childProcess.on('close', (code) => {
-        resolve({ stdout, stderr, code });
-      });
-      
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
+    const result = await executeDockerCommand(['compose', 'up', 'nginx', '-d']);
     
     if (result.code === 0) {
       return {
@@ -495,11 +387,9 @@ server.registerTool('nginx_version', {
   description: 'Get NGINX version and configuration details by executing nginx -V inside the container',
 }, async () => {
   try {
-    const { spawn } = await import('child_process');
     const fs = await import('fs/promises');
     const path = await import('path');
     
-    // Check if docker-compose.yml exists in the current working directory
     const dockerComposeFile = path.join(process.cwd(), 'docker-compose.yml');
     let dockerComposeExists = false;
     try {
@@ -509,35 +399,10 @@ server.registerTool('nginx_version', {
       dockerComposeExists = false;
     }
     
-    // Execute docker compose exec nginx nginx -V
-    const result = await new Promise((resolve, reject) => {
-      const childProcess = spawn('docker', ['compose', 'exec', '-T', 'nginx', 'nginx', '-V'], {
-        cwd: PROJECT_DIR,
-        stdio: 'pipe',
-        env: process.env
-      });
-      
-      let stdout = '';
-      let stderr = '';
-      
-      childProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      childProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      childProcess.on('close', (code) => {
-        resolve({ stdout, stderr, code });
-      });
-      
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
+    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-V'], {
+      env: process.env
     });
     
-    // Check if we got the expected output or an error
     if (result.stderr && result.stderr.includes('no configuration file provided')) {
       return {
         content: [
@@ -549,7 +414,6 @@ server.registerTool('nginx_version', {
       };
     }
     
-    // nginx -V outputs to stderr, not stdout
     const output = result.stderr || result.stdout;
     
     return {
