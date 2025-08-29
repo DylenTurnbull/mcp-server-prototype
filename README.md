@@ -7,7 +7,8 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with tools
 
 ## Features
 
-- **🔍 Real-time Monitoring**: Live NGINX status and connection metrics
+- **� Log Management**: Access recent, extended, and timestamped NGINX logs
+- **�🔍 Real-time Monitoring**: Live NGINX status and connection metrics
 - **📄 Configuration Access**: Retrieve and analyze NGINX config files  
 - **⚡ Health Checks**: Built-in connectivity testing with timestamps
 - **🚀 Runtime Control**: Start, stop, reload, and manage NGINX containers
@@ -188,6 +189,14 @@ If you prefer to set everything up step by step:
 
 ## Available Tools
 
+### Log Management Tools
+| Tool | Description |
+|------|-------------|
+| `nginx_logs_recent` | Get recent NGINX logs (last 5 lines) |
+| `nginx_logs_extended` | Get extended NGINX logs (last 25 lines) |
+| `nginx_logs_with_timestamps` | Get NGINX logs with Docker timestamps (last 10 lines) |
+| `nginx_logs_basic` | Basic NGINX log retrieval |
+
 ### Monitoring Tools
 | Tool | Description |
 |------|-------------|
@@ -209,6 +218,28 @@ If you prefer to set everything up step by step:
 ## Usage Examples
 
 Once everything is set up, you can ask Claude natural questions about your NGINX server. Here are some examples you can copy and paste:
+
+### Log Management Examples
+
+**View recent NGINX logs:**
+```
+Show me the recent NGINX logs
+```
+
+**Get more detailed log history:**
+```
+Show me extended NGINX logs with more entries
+```
+
+**View logs with timestamps:**
+```
+Show me NGINX logs with timestamps
+```
+
+**Basic log retrieval:**
+```
+Get basic NGINX logs
+```
 
 ### Monitoring Examples
 **Check if NGINX is running:**
