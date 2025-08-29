@@ -190,7 +190,7 @@ If you prefer to set everything up step by step:
 
 ## Available Tools
 
-### Log Management Tools
+### Log Management Tools (5 tools)
 | Tool | Description |
 |------|-------------|
 | `nginx_logs_recent` | Get recent NGINX logs (last 5 lines) |
@@ -199,22 +199,25 @@ If you prefer to set everything up step by step:
 | `nginx_logs_basic` | Basic NGINX log retrieval |
 | `nginx_logs_realtime` | Monitor NGINX logs with 10-second activity window, progress updates, and streaming guidance |
 
-### Monitoring Tools
+### Monitoring & Diagnostics Tools (3 tools)
 | Tool | Description |
 |------|-------------|
 | `nginx_connectivity_test` | Test connectivity and get status with timestamps |
 | `nginx_simple_status` | Get raw NGINX status metrics |
-| `nginx_server_info` | Get server configuration and environment info |
-| `nginx_get_config` | Read the complete NGINX configuration file |
+| `nginx_docker_diagnostics` | Comprehensive Docker container diagnostics and health checks |
 
-### Runtime Control Tools
+### Configuration Management Tools (3 tools)
+| Tool | Description |
+|------|-------------|
+| `nginx_get_config` | Read the complete NGINX configuration file |
+| `nginx_reload` | Reload NGINX configuration without restart |
+| `nginx_test_config` | Test NGINX configuration syntax |
+
+### Runtime Control Tools (3 tools)
 | Tool | Description |
 |------|-------------|
 | `nginx_start` | Start the NGINX container |
 | `nginx_stop` | Stop the NGINX container |
-| `nginx_reload` | Reload NGINX configuration without restart |
-| `nginx_test_config` | Test NGINX configuration syntax |
-| `nginx_quit` | Quit NGINX process gracefully (waits for connections) |
 | `nginx_version` | Get NGINX version and configuration details |
 
 ## Usage Examples
@@ -264,9 +267,9 @@ Show me the current NGINX status and connection statistics
 Can you show me my NGINX configuration file?
 ```
 
-**Get detailed server information:**
+**Run Docker diagnostics:**
 ```
-What can you tell me about my NGINX server setup and environment?
+Run comprehensive Docker diagnostics on my NGINX container
 ```
 
 ### Runtime Control Examples
@@ -293,11 +296,6 @@ Test my NGINX configuration for syntax errors before reloading
 **Get version information:**
 ```
 What version of NGINX is running?
-```
-
-**Graceful shutdown:**
-```
-Gracefully stop NGINX and wait for active connections to finish
 ```
 
 ## Troubleshooting
@@ -338,14 +336,13 @@ npm start
 
 ```
 mcp-server-prototype/
-├── src/index.js              # Main MCP server with runtime controls
+├── src/index.js              # Main MCP server with 14 tools
 ├── config.json.example       # Configuration template (safe for git)
 ├── config.json               # Local configuration (ignored by git)
 ├── .env.example              # Environment variables template
 ├── nginx.conf                # NGINX configuration
-├── docker-compose.yml        # Docker setup
-├── claude-desktop-config.json # Claude integration
-└── package.json              # Dependencies
+├── docker-compose.yml        # Docker setup with NGINX service
+└── package.json              # Dependencies and scripts
 ```
 
 ## Resources
