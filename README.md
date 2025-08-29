@@ -1,4 +1,4 @@
-# MCP S## Features
+# MCP Server Prototype
 
 - **📋 Advanced Log Management**: Access recent, extended, timestamped, and real-time NGINX logs
 - **⏱️ Near Real-time Monitoring**: Smart 10-second monitoring windows with activity detection
@@ -9,7 +9,7 @@
 - **🔧 Configuration Management**: Test and reload NGINX configs without restart
 - **⚙️ External Configuration**: JSON config file with environment variable overrides
 - **🛠️ MCP Compliant**: Built with official SDK v1.15.1 with triple-fallback execution
-- **🐳 Containerized**: Complete Docker setup with NGINX instancetype
+- **🐳 Containerized**: Complete Docker setup with NGINX instance
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
@@ -18,8 +18,8 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with tools
 
 ## Features
 
-- **� Log Management**: Access recent, extended, and timestamped NGINX logs
-- **�🔍 Real-time Monitoring**: Live NGINX status and connection metrics
+- **📋 Log Management**: Access recent, extended, and timestamped NGINX logs
+- **🔍 Real-time Monitoring**: Live NGINX status and connection metrics
 - **📄 Configuration Access**: Retrieve and analyze NGINX config files  
 - **⚡ Health Checks**: Built-in connectivity testing with timestamps
 - **🚀 Runtime Control**: Start, stop, reload, and manage NGINX containers
