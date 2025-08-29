@@ -1,4 +1,15 @@
-# MCP Server Prototype
+# MCP S## Features
+
+- **📋 Advanced Log Management**: Access recent, extended, timestamped, and real-time NGINX logs
+- **⏱️ Near Real-time Monitoring**: Smart 10-second monitoring windows with activity detection
+- **🔍 Live Status Monitoring**: NGINX status and connection metrics with health checks
+- **📄 Configuration Access**: Retrieve and analyze NGINX config files  
+- **⚡ Health Checks**: Built-in connectivity testing with timestamps
+- **🚀 Runtime Control**: Start, stop, reload, and manage NGINX containers
+- **🔧 Configuration Management**: Test and reload NGINX configs without restart
+- **⚙️ External Configuration**: JSON config file with environment variable overrides
+- **🛠️ MCP Compliant**: Built with official SDK v1.15.1 with triple-fallback execution
+- **🐳 Containerized**: Complete Docker setup with NGINX instancetype
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://docs.docker.com/compose/)
@@ -196,6 +207,7 @@ If you prefer to set everything up step by step:
 | `nginx_logs_extended` | Get extended NGINX logs (last 25 lines) |
 | `nginx_logs_with_timestamps` | Get NGINX logs with Docker timestamps (last 10 lines) |
 | `nginx_logs_basic` | Basic NGINX log retrieval |
+| `nginx_logs_realtime` | Monitor NGINX logs with 10-second activity window, progress updates, and streaming guidance |
 
 ### Monitoring Tools
 | Tool | Description |
@@ -239,6 +251,11 @@ Show me NGINX logs with timestamps
 **Basic log retrieval:**
 ```
 Get basic NGINX logs
+```
+
+**Monitor logs in real-time:**
+```
+Monitor NGINX logs in real-time
 ```
 
 ### Monitoring Examples

@@ -89,5 +89,8 @@ claude-desktop-config.json
 # Local configuration with system-specific paths
 config.json
 
+# Internal planning and feature documentation
+FEATURE_OPTIONS.md
+
 # VS specific (Windows)
 .vs/

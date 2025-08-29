@@ -186,6 +186,89 @@ server.registerTool('nginx_logs_basic', {
   }
 });
 
+server.registerTool('nginx_logs_realtime', {
+  description: 'Monitor NGINX logs in real-time with status updates and activity window',
+}, async () => {
+  try {
+    const startTime = new Date();
+    const responses = [];
+    
+    // Step 1: Get initial baseline logs
+    responses.push('🔄 **Real-time NGINX Log Monitoring Started**');
+    responses.push(`🕐 **Start Time:** ${startTime.toISOString()}`);
+    responses.push('');
+    
+    // Step 2: Get recent logs for context
+    const recentResult = await executeDockerCommandRobust(['compose', 'logs', '--tail', '15', '--timestamps', 'nginx']);
+    if (recentResult.success) {
+      responses.push('📋 **Recent Activity (Last 15 entries):**');
+      responses.push('```');
+      responses.push(recentResult.stdout || 'No recent logs found');
+      responses.push('```');
+      responses.push('');
+    }
+    
+    // Step 3: Monitor for new activity over 10 seconds
+    responses.push('⏱️ **Monitoring window: 10 seconds...**');
+    
+    // Get logs since start time (using a recent timestamp approach)
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+    
+    const midResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '5s', '--timestamps', 'nginx']);
+    if (midResult.success && midResult.stdout.trim()) {
+      responses.push('🔄 **Activity detected (last 5 seconds):**');
+      responses.push('```');
+      responses.push(midResult.stdout);
+      responses.push('```');
+    }
+    
+    // Wait another 7 seconds and check again
+    await new Promise(resolve => setTimeout(resolve, 7000));
+    
+    const finalResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '10s', '--timestamps', 'nginx']);
+    const endTime = new Date();
+    
+    responses.push('');
+    responses.push('📊 **Monitoring Complete**');
+    responses.push(`🕐 **End Time:** ${endTime.toISOString()}`);
+    responses.push(`⏱️ **Duration:** ${Math.round((endTime - startTime) / 1000)}s`);
+    
+    if (finalResult.success && finalResult.stdout.trim()) {
+      const logLines = finalResult.stdout.trim().split('\n');
+      responses.push(`📈 **Activity Summary:** ${logLines.length} new log entries detected`);
+      responses.push('');
+      responses.push('📋 **All Activity in Monitoring Window:**');
+      responses.push('```');
+      responses.push(finalResult.stdout);
+      responses.push('```');
+    } else {
+      responses.push('📈 **Activity Summary:** No new activity detected during monitoring window');
+    }
+    
+    // Step 4: Provide real-time streaming guidance
+    responses.push('');
+    responses.push('🔄 **For Continuous Real-time Monitoring:**');
+    responses.push('```bash');
+    responses.push('# Stream all new NGINX logs (run in terminal)');
+    responses.push('docker logs -f nginx-server');
+    responses.push('');
+    responses.push('# Stream with timestamps');
+    responses.push('docker logs -f -t nginx-server');
+    responses.push('');
+    responses.push('# Stream only new entries (ignoring history)');
+    responses.push('docker logs --tail 0 -f nginx-server');
+    responses.push('```');
+    
+    responses.push('');
+    responses.push('💡 **Tip:** Run the above commands in a separate terminal for true real-time streaming that continues indefinitely.');
+    
+    return createResponse(responses.join('\n'));
+    
+  } catch (error) {
+    return createResponse(`❌ Real-time monitoring failed: ${error.message}`);
+  }
+});
+
 const configTools = [
   ['nginx_get_config', 'Retrieve the current NGINX configuration', async () => {
     const response = await axios.get(`${NGINX_URL}/nginx_conf`, { timeout: 10000, headers: AXIOS_CONFIG.headers });
