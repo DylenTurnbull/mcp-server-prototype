@@ -6,439 +6,329 @@ import axios from 'axios';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { promisify } from 'util';
+import { spawn, exec, execSync } from 'child_process';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const execAsync = promisify(exec);
 
-const configPath = join(__dirname, '..', 'config.json');
 let config;
 try {
-  config = JSON.parse(readFileSync(configPath, 'utf8'));
+  config = JSON.parse(readFileSync(join(__dirname, '..', 'config.json'), 'utf8'));
 } catch (error) {
-  if (error.code === 'ENOENT') {
-    console.error(`❌ Configuration file not found: ${configPath}`);
-    console.error(`💡 Please copy config.json.example to config.json and customize it:`);
-    console.error(`   cp config.json.example config.json`);
-    console.error(`   # Then edit config.json with your specific paths`);
-  } else {
-    console.error(`❌ Failed to parse configuration from ${configPath}:`, error.message);
-  }
+  console.error(error.code === 'ENOENT' ? 
+    '❌ Config file not found. Please copy config.json.example to config.json and configure it.' : 
+    `❌ Error reading config file: ${error.message}`);
   process.exit(1);
 }
 
-const NGINX_HOST = process.env.NGINX_HOST || config.nginx.host;
-const NGINX_PORT = process.env.NGINX_PORT || config.nginx.port;
-const NGINX_BASE_URL = `http://${NGINX_HOST}:${NGINX_PORT}`;
-
 const PROJECT_DIR = process.env.PROJECT_DIR || config.project.directory;
+const NGINX_URL = `http://${config.nginx.host}:${config.nginx.port}`;
+const TIMEOUT = 15000;
+const DOCKER_ENV = { ...process.env, PATH: process.env.PATH };
+const AXIOS_CONFIG = { timeout: 5000, headers: { 'User-Agent': 'NGINX-MCP-Server/1.0' } };
 
-const SERVER_NAME = process.env.SERVER_NAME || config.server.name;
-const SERVER_VERSION = process.env.SERVER_VERSION || config.server.version;
+const server = new McpServer({
+  name: 'nginx-tools',
+  version: '1.0.0',
+  description: 'NGINX Tools MCP Server - Comprehensive NGINX container management with Docker integration'
+});
 
-const HTTP_TIMEOUT = process.env.HTTP_TIMEOUT || config.timeouts.httpRequest;
+const createResult = (stdout, stderr, code, method, command, error = null, timeout = false) => ({
+  stdout, stderr, code: code || 0, success: code === 0,
+  debug: { 
+    command: command || '', 
+    method, 
+    ...(error && { error }), 
+    ...(timeout && { timeout }), 
+    timestamp: new Date().toISOString() 
+  }
+});
 
-async function executeDockerCommand(args, options = {}) {
-  const { spawn } = await import('child_process');
-  
-  return new Promise((resolve, reject) => {
-    const childProcess = spawn('docker', args, {
-      cwd: PROJECT_DIR,
-      stdio: 'pipe',
-      ...options
+async function executeDockerCommand(args) {
+  return new Promise((resolve) => {
+    const child = spawn('docker', args, { cwd: PROJECT_DIR, env: DOCKER_ENV, stdio: ['inherit', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    const command = `docker ${args.join(' ')}`;
+    
+    child.stdout?.on('data', (data) => stdout += data.toString());
+    child.stderr?.on('data', (data) => stderr += data.toString());
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      resolve(createResult('', 'Command timed out after 15 seconds', 124, 'spawn', command, null, true));
+    }, TIMEOUT);
+
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      resolve(createResult(stdout, stderr, code, 'spawn', command));
     });
-    
-    let stdout = '';
-    let stderr = '';
-    
-    childProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    childProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    childProcess.on('close', (code) => {
-      resolve({ stdout, stderr, code });
-    });
-    
-    childProcess.on('error', (error) => {
-      reject(error);
+
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      resolve(createResult('', error.message, 1, 'spawn', command, error.message));
     });
   });
 }
 
-function formatResponse(text) {
-  return {
-    content: [{ type: 'text', text }]
-  };
+async function executeDockerCommandAlt(args) {
+  const command = `docker ${args.join(' ')}`;
+  try {
+    const { stdout, stderr } = await execAsync(command, { cwd: PROJECT_DIR, timeout: TIMEOUT, env: DOCKER_ENV });
+    return createResult(stdout, stderr, 0, 'exec', command);
+  } catch (error) {
+    return createResult(error.stdout || '', error.stderr || error.message, error.code || 1, 'exec', command, error.message);
+  }
 }
 
-const server = new McpServer({
-  name: SERVER_NAME,
-  version: SERVER_VERSION,
-});
-
-server.registerResource('nginx://config', {
-  description: 'NGINX server configuration file',
-  mimeType: 'text/plain',
-}, async () => {
+function executeDockerCommandSync(args) {
+  const command = `docker ${args.join(' ')}`;
   try {
-    const response = await axios.get(`${NGINX_BASE_URL}/nginx_conf`, { timeout: HTTP_TIMEOUT });
-    return {
-      contents: [
-        {
-          uri: 'nginx://config',
-          mimeType: 'text/plain',
-          text: response.data,
-        },
-      ],
-    };
+    const result = execSync(command, { cwd: PROJECT_DIR, encoding: 'utf8', timeout: TIMEOUT, env: DOCKER_ENV });
+    return createResult(result, '', 0, 'execSync', command);
   } catch (error) {
-    try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const configPath = path.join(PROJECT_DIR, 'nginx.conf');
-      const configContent = await fs.readFile(configPath, 'utf8');
-      return {
-        contents: [
-          {
-            uri: 'nginx://config',
-            mimeType: 'text/plain',
-            text: configContent,
-          },
-        ],
-      };
-    } catch (fallbackError) {
-      return {
-        contents: [
-          {
-            uri: 'nginx://config',
-            mimeType: 'text/plain',
-            text: `❌ Cannot access NGINX configuration\n\nAPI Error: ${error.message}\nFile Error: ${fallbackError.message}\n\n💡 Suggestions:\n- Ensure NGINX container is running\n- Check if nginx.conf exists in project directory\n- Verify NGINX config endpoint is available`,
-          },
-        ],
-      };
-    }
+    return createResult('', error.stderr || error.message, error.status || 1, 'execSync', command, error.message);
   }
-});
+}
+
+async function executeDockerCommandRobust(args) {
+  const spawnResult = await executeDockerCommand(args);
+  if (spawnResult.success) return spawnResult;
+  
+  const execResult = await executeDockerCommandAlt(args);
+  if (execResult.success) return { ...execResult, debug: { ...execResult.debug, fallbackUsed: true, primaryError: spawnResult.stderr } };
+  
+  const syncResult = executeDockerCommandSync(args);
+  if (syncResult.success) return { ...syncResult, debug: { ...syncResult.debug, fallbackUsed: true, primaryError: spawnResult.stderr, secondaryError: execResult.stderr } };
+  
+  return createResult('', `All execution methods failed. Last error: ${syncResult.stderr}`, 1, 'all_failed', `docker ${args.join(' ')}`);
+}
+
+const createResponse = (text) => ({ content: [{ type: 'text', text }] });
+const timestamp = () => new Date().toISOString();
 
 server.registerTool('nginx_connectivity_test', {
-  description: 'Test connectivity to NGINX server and get status with timestamps',
+  description: 'Test connectivity to NGINX server and get basic status information',
 }, async () => {
   try {
-    const response = await axios.get(`${NGINX_BASE_URL}/status`, { timeout: HTTP_TIMEOUT });
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `✅ NGINX connectivity test successful!\n\n📊 Status: HTTP ${response.status}\n📝 Response:\n${response.data}\n\n🕐 Timestamp: ${new Date().toISOString()}`
-        },
-      ],
-    };
+    const response = await axios.get(`${NGINX_URL}/nginx_status`, AXIOS_CONFIG);
+    return createResponse(`✅ NGINX connectivity test successful!\n\n📊 Status: HTTP ${response.status}\n📝 Response:\n${response.data}\n\n🕐 Timestamp: ${timestamp()}`);
   } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ NGINX connectivity test failed!\n\n⚠️ Error: ${error.message}\n\n💡 Suggestions:\n- Start NGINX: docker compose up nginx -d\n- Check if NGINX is running on port ${NGINX_PORT}\n- Verify Docker network connectivity`
-        },
-      ],
-    };
+    return createResponse(`❌ NGINX connectivity test failed!\n\n⚠️ Error: ${error.message}\n🌐 URL: ${NGINX_URL}/nginx_status\n🕐 Timestamp: ${timestamp()}\n\n💡 Ensure NGINX container is running: docker compose up nginx -d`);
   }
 });
 
 server.registerTool('nginx_simple_status', {
-  description: 'Get raw NGINX server status metrics and connection data',
+  description: 'Get raw NGINX status metrics without formatting',
 }, async () => {
   try {
-    const response = await axios.get(`${NGINX_BASE_URL}/status`, { timeout: HTTP_TIMEOUT });
-    return {
-      content: [
-        { type: 'text', text: `NGINX Status Response:\n${response.data}` },
-      ],
-    };
+    const response = await axios.get(`${NGINX_URL}/nginx_status`, AXIOS_CONFIG);
+    return createResponse(response.data);
   } catch (error) {
-    return {
-      content: [
-        { type: 'text', text: `Cannot connect to NGINX: ${error.message}` },
-      ],
-    };
+    return createResponse(`Error: ${error.message}`);
   }
 });
 
-server.registerTool('nginx_server_info', {
-  description: 'Get NGINX server configuration details, environment info, and available operations',
-}, async () => {
-  return {
-    content: [
-      { 
-        type: 'text', 
-        text: `📋 NGINX Server Information:\n\n🌐 Service URL: ${NGINX_BASE_URL}\n📂 Status Endpoint: /status\n📄 Config Endpoint: /nginx_conf\n🐳 Container: nginx (Docker)\n⚡ Port: ${NGINX_PORT}\n📦 Environment: Docker Compose\n🔧 Image: nginx:latest\n\n🛠️ Available MCP Tools:\n- nginx_connectivity_test: Test server connectivity\n- nginx_simple_status: Get raw status metrics\n- nginx_get_config: Read configuration file\n- nginx_server_info: This server information\n- nginx_start: Start NGINX container\n- nginx_stop: Stop NGINX container\n- nginx_reload: Reload NGINX configuration\n- nginx_test_config: Test configuration syntax\n- nginx_quit: Quit NGINX process gracefully (waits for connections)\n- nginx_version: Get NGINX version information\n\n📚 Available Resources:\n- nginx://config: Configuration file content\n\n🚀 Quick Commands:\n- Start: docker compose up nginx -d\n- Stop: docker compose stop nginx\n- Logs: docker compose logs nginx\n- Status: docker compose ps\n\n💡 Note: This shows server setup info, not live metrics. Use nginx_simple_status for current connection data.`
-      },
-    ],
-  };
-});
-
-server.registerTool('nginx_get_config', {
-  description: 'Read and display the complete NGINX configuration file content',
+server.registerTool('nginx_docker_diagnostics', {
+  description: 'Run comprehensive Docker environment diagnostics for NGINX container',
 }, async () => {
   try {
-    const response = await axios.get(`${NGINX_BASE_URL}/nginx_conf`, { timeout: HTTP_TIMEOUT });
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `📄 NGINX Configuration (from server):\n🌐 Source: ${NGINX_BASE_URL}/nginx_conf\n\n\`\`\`nginx\n${response.data}\n\`\`\``
-        },
-      ],
-    };
-  } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Unable to retrieve real NGINX configuration\n\n� Error: ${error.message}\n\n⚠️ This tool can only access the actual running NGINX server configuration through the web endpoint. Local file fallbacks have been disabled to ensure data authenticity.\n\n💡 Troubleshooting:\n- Ensure NGINX container is running: docker compose ps\n- Check NGINX service status: docker compose logs nginx\n- Verify web endpoint: curl ${NGINX_BASE_URL}/nginx_conf\n- Confirm container port mapping: docker compose port nginx 8080\n\n🔧 To fix:\n1. Start NGINX: docker compose up nginx -d\n2. Wait for container to be healthy\n3. Try this tool again`
-        },
-      ],
-    };
-  }
-});
-
-server.registerTool('nginx_reload', {
-  description: 'Reload NGINX configuration by executing nginx -s reload inside the container',
-}, async () => {
-  try {
-    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-s', 'reload']);
+    const [dockerVersion, composeVersion, containerStatus] = await Promise.all([
+      executeDockerCommandRobust(['--version']),
+      executeDockerCommandRobust(['compose', 'version']),
+      executeDockerCommandRobust(['compose', 'ps'])
+    ]);
     
-    if (result.code === 0) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `✅ NGINX configuration reloaded successfully!\n\n📝 Command: docker compose exec nginx nginx -s reload\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stdout || 'No output (normal for successful reload)'}\n${result.stderr ? `\n⚠️ Stderr: ${result.stderr}` : ''}`
-          },
-        ],
-      };
-    } else {
-      throw new Error(`Command failed with code ${result.code}: ${result.stderr}`);
-    }
+    const diagnostics = [
+      `✅ Docker Version: ${dockerVersion.stdout.trim()}`,
+      `✅ Docker Compose: ${composeVersion.stdout.trim()}`,
+      `✅ Container Status:\n${containerStatus.stdout.trim()}`
+    ];
+    
+    const envInfo = [`- Working Directory: ${PROJECT_DIR}`, `- Platform: ${process.platform}`, `- Node Version: ${process.version}`, `- NGINX URL: ${NGINX_URL}`];
+    return createResponse(`🔍 Docker Environment Diagnostics\n🕐 Timestamp: ${timestamp()}\n\n${diagnostics.join('\n')}\n\n📂 Environment Information:\n${envInfo.join('\n')}`);
   } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Failed to reload NGINX configuration!\n\n⚠️ Error: ${error.message}\n\n💡 Troubleshooting:\n- Ensure NGINX container is running: docker compose ps\n- Check container logs: docker compose logs nginx\n- Verify configuration syntax: nginx -t\n- Make sure Docker is running and accessible\n\n🔧 Try starting container: docker compose up nginx -d`
-        },
-      ],
-    };
+    return createResponse(`❌ Docker diagnostics failed: ${error.message}`);
   }
 });
 
-server.registerTool('nginx_test_config', {
-  description: 'Test NGINX configuration syntax by executing nginx -t inside the container',
-}, async () => {
-  try {
-    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-t']);
-    
-    if (result.code === 0) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `✅ NGINX configuration test passed!\n\n📝 Command: docker compose exec nginx nginx -t\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stderr || result.stdout || 'Configuration syntax is ok'}`
-          },
-        ],
-      };
-    } else {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `❌ NGINX configuration test failed!\n\n📝 Command: docker compose exec nginx nginx -t\n🕐 Timestamp: ${new Date().toISOString()}\n\n⚠️ Configuration errors:\n${result.stderr}\n${result.stdout ? `\nStdout: ${result.stdout}` : ''}\n\n💡 Fix the configuration errors before reloading NGINX.`
-          },
-        ],
-      };
-    }
-  } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Failed to test NGINX configuration!\n\n⚠️ Error: ${error.message}\n\n💡 Troubleshooting:\n- Ensure NGINX container is running: docker compose ps\n- Check container logs: docker compose logs nginx\n- Make sure Docker is running and accessible\n\n🔧 Try starting container: docker compose up nginx -d`
-        },
-      ],
-    };
-  }
-});
+const logTools = [
+  ['nginx_logs_recent', 'Get recent NGINX logs (last 5 lines)', '5'],
+  ['nginx_logs_extended', 'Get extended NGINX logs (last 25 lines)', '25'],
+  ['nginx_logs_with_timestamps', 'Get NGINX logs with Docker timestamps (last 10 lines)', '10', '--timestamps']
+];
 
-server.registerTool('nginx_stop', {
-  description: 'Stop the NGINX container using Docker Compose',
-}, async () => {
-  try {
-    const result = await executeDockerCommand(['compose', 'stop', 'nginx']);
-    
-    if (result.code === 0) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `✅ NGINX container stopped successfully!\n\n📝 Command: docker compose stop nginx\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stdout || result.stderr || 'Container stopped gracefully'}\n\n💡 The NGINX container has been stopped. Use nginx_start to restart it.\n\n🔄 Note: This is the complement to nginx_start - it stops the entire container, not just the NGINX process.`
-          },
-        ],
-      };
-    } else {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `⚠️ NGINX stop command completed with exit code ${result.code}\n\n📝 Command: docker compose stop nginx\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stderr || result.stdout || 'No output'}\n\n💡 The container may already be stopped.`
-          },
-        ],
-      };
-    }
-  } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Failed to stop NGINX container!\n\n⚠️ Error: ${error.message}\n\n💡 Troubleshooting:\n- Check if NGINX container is running: docker compose ps\n- Make sure Docker is running and accessible\n- Verify docker-compose.yml exists in project directory\n\n🔧 Container may already be stopped. Use nginx_start to start it.`
-        },
-      ],
-    };
-  }
-});
-
-server.registerTool('nginx_quit', {
-  description: 'Quit NGINX gracefully by executing nginx -s quit inside the container (waits for active connections to finish)',
-}, async () => {
-  try {
-    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-s', 'quit']);
-    
-    if (result.code === 0) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `✅ NGINX quit gracefully!\n\n📝 Command: docker compose exec nginx nginx -s quit\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stdout || result.stderr || 'NGINX process quit gracefully'}\n\n💡 Note: nginx -s quit waits for active connections to finish before stopping, unlike nginx -s stop which stops immediately. The container will restart NGINX automatically.`
-          },
-        ],
-      };
-    } else {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `⚠️ NGINX quit command completed with exit code ${result.code}\n\n📝 Command: docker compose exec nginx nginx -s quit\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stderr || result.stdout || 'No output'}\n\n💡 This may be normal if NGINX was already stopped.`
-          },
-        ],
-      };
-    }
-  } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Failed to quit NGINX!\n\n⚠️ Error: ${error.message}\n\n💡 Troubleshooting:\n- Ensure NGINX container is running: docker compose ps\n- Check container logs: docker compose logs nginx\n- Make sure Docker is running and accessible\n- NGINX may already be stopped\n\n🔧 To restart: docker compose restart nginx`
-        },
-      ],
-    };
-  }
-});
-
-server.registerTool('nginx_start', {
-  description: 'Start the NGINX container using Docker Compose',
-}, async () => {
-  try {
-    const result = await executeDockerCommand(['compose', 'up', 'nginx', '-d']);
-    
-    if (result.code === 0) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `✅ NGINX container started successfully!\n\n📝 Command: docker compose up nginx -d\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stdout || result.stderr || 'Container started in detached mode'}\n\n🌐 NGINX should now be accessible at: http://localhost:8080\n\n💡 Use nginx_connectivity_test to verify the server is responding.`
-          },
-        ],
-      };
-    } else {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `⚠️ NGINX start command completed with exit code ${result.code}\n\n📝 Command: docker compose up nginx -d\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${result.stderr || result.stdout || 'No output'}\n\n💡 The container may already be running or there might be a configuration issue.`
-          },
-        ],
-      };
-    }
-  } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Failed to start NGINX container!\n\n⚠️ Error: ${error.message}\n\n💡 Troubleshooting:\n- Make sure Docker is running and accessible\n- Check if docker-compose.yml exists in project directory\n- Verify Docker Compose is installed\n- Check for port conflicts on port 8080\n\n🔧 Try manually: docker compose up nginx -d`
-        },
-      ],
-    };
-  }
-});
-
-server.registerTool('nginx_version', {
-  description: 'Get NGINX version and configuration details by executing nginx -V inside the container',
-}, async () => {
-  try {
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    
-    const dockerComposeFile = path.join(process.cwd(), 'docker-compose.yml');
-    let dockerComposeExists = false;
+logTools.forEach(([name, desc, lines, ...flags]) => {
+  server.registerTool(name, { description: desc }, async () => {
     try {
-      await fs.access(dockerComposeFile);
-      dockerComposeExists = true;
-    } catch {
-      dockerComposeExists = false;
+      const result = await executeDockerCommandRobust(['compose', 'logs', '--tail', lines, ...flags, 'nginx']);
+      return result.success ? 
+        createResponse(`📋 ${desc.replace('Get ', '').replace(/^\w/, c => c.toUpperCase())}\n🕐 ${timestamp()}\n\n${result.stdout}`) :
+        createResponse(`❌ Error: ${result.stderr}`);
+    } catch (error) {
+      return createResponse(`❌ Error: ${error.message}`);
     }
-    
-    const result = await executeDockerCommand(['compose', 'exec', '-T', 'nginx', 'nginx', '-V'], {
-      env: process.env
-    });
-    
-    if (result.stderr && result.stderr.includes('no configuration file provided')) {
-      return {
-        content: [
-          { 
-            type: 'text', 
-            text: `📊 NGINX Version Information:\n\n📝 Command: docker compose exec nginx nginx -V\n🕐 Timestamp: ${new Date().toISOString()}\n\n⚠️ Docker Compose Error: ${result.stderr}\n\n🔍 Debug info:\n- Working directory: ${process.cwd()}\n- Docker compose file exists: ${dockerComposeExists}\n- Exit code: ${result.code}\n\n💡 This error suggests the docker-compose.yml file isn't found in the working directory when the MCP server runs.`
-          },
-        ],
-      };
+  });
+});
+
+server.registerTool('nginx_logs_basic', {
+  description: 'Get NGINX logs (last 10 lines)',
+}, async () => {
+  try {
+    const result = await executeDockerCommandRobust(['compose', 'logs', '--tail', '10', 'nginx']);
+    if (result.success) {
+      const method = result.debug.syncFallback ? 'Synchronous' : result.debug.fallbackUsed ? 'Async Fallback' : 'Primary Async';
+      return createResponse(`📋 NGINX Logs (10 most recent lines)\n\n🔧 Method: ${method}\n📝 Command: docker compose logs --tail 10 nginx\n🕐 Retrieved: ${result.debug.timestamp}\n\n📄 Logs:\n${result.stdout}`);
     }
-    
-    const output = result.stderr || result.stdout;
-    
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `📊 NGINX Version Information:\n\n📝 Command: docker compose exec nginx nginx -V\n🕐 Timestamp: ${new Date().toISOString()}\n\n📋 Output:\n${output || 'No version information available'}`
-        },
-      ],
-    };
+    return createResponse(`❌ Error: ${result.stderr}`);
   } catch (error) {
-    return {
-      content: [
-        { 
-          type: 'text', 
-          text: `❌ Failed to get NGINX version!\n\n⚠️ Error: ${error.message}\n\n� Debug info:\n- Working directory: ${process.cwd()}\n- Command attempted: docker compose exec -T nginx nginx -V\n\n�💡 Troubleshooting:\n- Ensure NGINX container is running: docker compose ps\n- Check container logs: docker compose logs nginx\n- Make sure Docker is running and accessible\n\n🔧 Try starting container: docker compose up nginx -d`
-        },
-      ],
-    };
+    return createResponse(`❌ Error: ${error.message}`);
   }
+});
+
+server.registerTool('nginx_logs_realtime', {
+  description: 'Monitor NGINX logs in real-time with status updates and activity window',
+}, async () => {
+  try {
+    const startTime = new Date();
+    const responses = [];
+    
+    // Step 1: Get initial baseline logs
+    responses.push('🔄 **Real-time NGINX Log Monitoring Started**');
+    responses.push(`🕐 **Start Time:** ${startTime.toISOString()}`);
+    responses.push('');
+    
+    // Step 2: Get recent logs for context
+    const recentResult = await executeDockerCommandRobust(['compose', 'logs', '--tail', '15', '--timestamps', 'nginx']);
+    if (recentResult.success) {
+      responses.push('📋 **Recent Activity (Last 15 entries):**');
+      responses.push('```');
+      responses.push(recentResult.stdout || 'No recent logs found');
+      responses.push('```');
+      responses.push('');
+    }
+    
+    // Step 3: Monitor for new activity over 10 seconds
+    responses.push('⏱️ **Monitoring window: 10 seconds...**');
+    
+    // Get logs since start time (using a recent timestamp approach)
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+    
+    const midResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '5s', '--timestamps', 'nginx']);
+    if (midResult.success && midResult.stdout.trim()) {
+      responses.push('🔄 **Activity detected (last 5 seconds):**');
+      responses.push('```');
+      responses.push(midResult.stdout);
+      responses.push('```');
+    }
+    
+    // Wait another 7 seconds and check again
+    await new Promise(resolve => setTimeout(resolve, 7000));
+    
+    const finalResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '10s', '--timestamps', 'nginx']);
+    const endTime = new Date();
+    
+    responses.push('');
+    responses.push('📊 **Monitoring Complete**');
+    responses.push(`🕐 **End Time:** ${endTime.toISOString()}`);
+    responses.push(`⏱️ **Duration:** ${Math.round((endTime - startTime) / 1000)}s`);
+    
+    if (finalResult.success && finalResult.stdout.trim()) {
+      const logLines = finalResult.stdout.trim().split('\n');
+      responses.push(`📈 **Activity Summary:** ${logLines.length} new log entries detected`);
+      responses.push('');
+      responses.push('📋 **All Activity in Monitoring Window:**');
+      responses.push('```');
+      responses.push(finalResult.stdout);
+      responses.push('```');
+    } else {
+      responses.push('📈 **Activity Summary:** No new activity detected during monitoring window');
+    }
+    
+    // Step 4: Provide real-time streaming guidance
+    responses.push('');
+    responses.push('🔄 **For Continuous Real-time Monitoring:**');
+    responses.push('```bash');
+    responses.push('# Stream all new NGINX logs (run in terminal)');
+    responses.push('docker logs -f nginx-server');
+    responses.push('');
+    responses.push('# Stream with timestamps');
+    responses.push('docker logs -f -t nginx-server');
+    responses.push('');
+    responses.push('# Stream only new entries (ignoring history)');
+    responses.push('docker logs --tail 0 -f nginx-server');
+    responses.push('```');
+    
+    responses.push('');
+    responses.push('💡 **Tip:** Run the above commands in a separate terminal for true real-time streaming that continues indefinitely.');
+    
+    return createResponse(responses.join('\n'));
+    
+  } catch (error) {
+    return createResponse(`❌ Real-time monitoring failed: ${error.message}`);
+  }
+});
+
+const configTools = [
+  ['nginx_get_config', 'Retrieve the current NGINX configuration', async () => {
+    const response = await axios.get(`${NGINX_URL}/nginx_conf`, { timeout: 10000, headers: AXIOS_CONFIG.headers });
+    return `📄 NGINX Configuration\n🕐 Retrieved: ${timestamp()}\n\n${response.data}`;
+  }],
+  ['nginx_reload', 'Reload NGINX configuration without stopping the server', async () => {
+    const result = await executeDockerCommandRobust(['compose', 'exec', 'nginx', 'nginx', '-s', 'reload']);
+    return result.success ? 
+      `✅ NGINX configuration reloaded successfully!\n🕐 ${timestamp()}\n\n📝 Output: ${result.stdout || 'Configuration reloaded without errors'}` :
+      `❌ Failed to reload NGINX configuration: ${result.stderr}`;
+  }],
+  ['nginx_test_config', 'Test NGINX configuration syntax without applying changes', async () => {
+    const result = await executeDockerCommandRobust(['compose', 'exec', 'nginx', 'nginx', '-t']);
+    return result.success ? 
+      `✅ NGINX configuration test passed!\n🕐 ${timestamp()}\n\n📝 Output: ${result.stderr || result.stdout || 'Configuration syntax is OK'}` :
+      `❌ NGINX configuration test failed!\n\n⚠️ Error: ${result.stderr}\n\n💡 Fix the configuration errors before reloading NGINX.`;
+  }]
+];
+
+configTools.forEach(([name, desc, handler]) => {
+  server.registerTool(name, { description: desc }, async () => {
+    try {
+      return createResponse(await handler());
+    } catch (error) {
+      return createResponse(`❌ Error: ${error.message}`);
+    }
+  });
+});
+
+const serviceTools = [
+  ['nginx_stop', 'Stop the NGINX container', ['compose', 'stop', 'nginx'], '✅ NGINX container stopped successfully!', 'Container stopped'],
+  ['nginx_start', 'Start the NGINX container', ['compose', 'up', 'nginx', '-d'], '✅ NGINX container started successfully!', 'Container started in detached mode', `\n\n🌐 NGINX should be available at: ${NGINX_URL}`],
+  ['nginx_version', 'Get NGINX version information from the running container', ['compose', 'exec', 'nginx', 'nginx', '-v'], '📦 NGINX Version Information', null]
+];
+
+serviceTools.forEach(([name, desc, command, successMsg, defaultOutput, suffix = '']) => {
+  server.registerTool(name, { description: desc }, async () => {
+    try {
+      const result = await executeDockerCommandRobust(command);
+      if (result.success) {
+        const output = name === 'nginx_version' ? (result.stderr || result.stdout) : (result.stdout || defaultOutput);
+        return createResponse(`${successMsg}\n🕐 ${timestamp()}\n\n${name === 'nginx_version' ? '' : '📝 Output: '}${output}${suffix}`);
+      }
+      return createResponse(`❌ Failed to ${desc.toLowerCase()}: ${result.stderr}`);
+    } catch (error) {
+      return createResponse(`❌ Error ${desc.toLowerCase().replace('get ', 'getting ')}: ${error.message}`);
+    }
+  });
+});
+
+server.registerResource('nginx://config', {
+  description: 'NGINX configuration file content',
+  mimeType: 'text/plain'
+}, async () => {
+  const response = await axios.get(`${NGINX_URL}/nginx_conf`, { timeout: 10000, headers: AXIOS_CONFIG.headers });
+  return { contents: [{ uri: 'nginx://config', mimeType: 'text/plain', text: response.data }] };
 });
 
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  await server.connect(new StdioServerTransport());
   console.error('✅ NGINX Tools MCP Server started successfully');
 }
 
