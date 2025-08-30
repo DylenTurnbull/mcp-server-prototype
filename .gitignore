@@ -92,5 +92,9 @@ config.json
 # Internal planning and feature documentation
 FEATURE_OPTIONS.md
 
+# Documentation and heavily commented code files for development reference
+src/index_commented.js
+NGINX_MCP_SERVER_DOCS.md
+
 # VS specific (Windows)
 .vs/
