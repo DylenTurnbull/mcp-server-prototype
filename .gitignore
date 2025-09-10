@@ -98,3 +98,14 @@ NGINX_MCP_SERVER_DOCS.md
 
 # VS specific (Windows)
 .vs/
+
+# SSL/TLS Certificates and Keys (NEVER commit these!)
+ssl/
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+certificates/
+certs/
+keys/
