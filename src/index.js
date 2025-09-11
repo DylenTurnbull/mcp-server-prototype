@@ -161,7 +161,7 @@ const logTools = [
 logTools.forEach(([name, desc, lines, ...flags]) => {
   server.registerTool(name, { description: desc }, async () => {
     try {
-      const result = await executeDockerCommandRobust(['compose', 'logs', '--tail', lines, ...flags, 'nginx-server']);
+      const result = await executeDockerCommandRobust(['compose', 'logs', '--tail', lines, ...flags, 'nginx']);
       return result.success ? 
         createResponse(`📋 ${desc.replace('Get ', '').replace(/^\w/, c => c.toUpperCase())}\n🕐 ${timestamp()}\n\n${result.stdout}`) :
         createResponse(`❌ Error: ${result.stderr}`);
@@ -175,7 +175,7 @@ server.registerTool('nginx_logs_basic', {
   description: 'Get NGINX logs (last 10 lines)',
 }, async () => {
   try {
-    const result = await executeDockerCommandRobust(['compose', 'logs', '--tail', '10', 'nginx-server']);
+    const result = await executeDockerCommandRobust(['compose', 'logs', '--tail', '10', 'nginx']);
     if (result.success) {
       const method = result.debug.syncFallback ? 'Synchronous' : result.debug.fallbackUsed ? 'Async Fallback' : 'Primary Async';
       return createResponse(`📋 NGINX Logs (10 most recent lines)\n\n🔧 Method: ${method}\n📝 Command: docker compose logs --tail 10 nginx\n🕐 Retrieved: ${result.debug.timestamp}\n\n📄 Logs:\n${result.stdout}`);
@@ -197,7 +197,7 @@ server.registerTool('nginx_logs_realtime', {
     responses.push(`🕐 **Start Time:** ${startTime.toISOString()}`);
     responses.push('');
     
-    const recentResult = await executeDockerCommandRobust(['compose', 'logs', '--tail', '15', '--timestamps', 'nginx-server']);
+    const recentResult = await executeDockerCommandRobust(['compose', 'logs', '--tail', '15', '--timestamps', 'nginx']);
     if (recentResult.success) {
       responses.push('📋 **Recent Activity (Last 15 entries):**');
       responses.push('```');
@@ -210,7 +210,7 @@ server.registerTool('nginx_logs_realtime', {
     
     await new Promise(resolve => setTimeout(resolve, 3000));
     
-    const midResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '5s', '--timestamps', 'nginx-server']);
+    const midResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '5s', '--timestamps', 'nginx']);
     if (midResult.success && midResult.stdout.trim()) {
       responses.push('🔄 **Activity detected (last 5 seconds):**');
       responses.push('```');
@@ -220,7 +220,7 @@ server.registerTool('nginx_logs_realtime', {
     
     await new Promise(resolve => setTimeout(resolve, 7000));
     
-    const finalResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '10s', '--timestamps', 'nginx-server']);
+    const finalResult = await executeDockerCommandRobust(['compose', 'logs', '--since', '10s', '--timestamps', 'nginx']);
     const endTime = new Date();
     
     responses.push('');
@@ -269,13 +269,13 @@ const configTools = [
     return `📄 NGINX Configuration\n🕐 Retrieved: ${timestamp()}\n\n${response.data}`;
   }],
   ['nginx_reload', 'Reload NGINX configuration without stopping the server', async () => {
-    const result = await executeDockerCommandRobust(['compose', 'exec', 'nginx-server', 'nginx', '-s', 'reload']);
+    const result = await executeDockerCommandRobust(['compose', 'exec', 'nginx', 'nginx', '-s', 'reload']);
     return result.success ? 
       `✅ NGINX configuration reloaded successfully!\n🕐 ${timestamp()}\n\n📝 Output: ${result.stdout || 'Configuration reloaded without errors'}` :
       `❌ Failed to reload NGINX configuration: ${result.stderr}`;
   }],
   ['nginx_test_config', 'Test NGINX configuration syntax without applying changes', async () => {
-    const result = await executeDockerCommandRobust(['compose', 'exec', 'nginx-server', 'nginx', '-t']);
+    const result = await executeDockerCommandRobust(['compose', 'exec', 'nginx', 'nginx', '-t']);
     return result.success ? 
       `✅ NGINX configuration test passed!\n🕐 ${timestamp()}\n\n📝 Output: ${result.stderr || result.stdout || 'Configuration syntax is OK'}` :
       `❌ NGINX configuration test failed!\n\n⚠️ Error: ${result.stderr}\n\n💡 Fix the configuration errors before reloading NGINX.`;
@@ -293,9 +293,9 @@ configTools.forEach(([name, desc, handler]) => {
 });
 
 const serviceTools = [
-  ['nginx_stop', 'Stop the NGINX container', ['compose', 'stop', 'nginx-server'], '✅ NGINX container stopped successfully!', 'Container stopped'],
-  ['nginx_start', 'Start the NGINX container', ['compose', 'up', 'nginx-server', '-d'], '✅ NGINX container started successfully!', 'Container started in detached mode', `\n\n🌐 NGINX should be available at: ${NGINX_URL}`],
-  ['nginx_version', 'Get NGINX version information from the running container', ['compose', 'exec', 'nginx-server', 'nginx', '-v'], '📦 NGINX Version Information', null]
+  ['nginx_stop', 'Stop the NGINX container', ['compose', 'stop', 'nginx'], '✅ NGINX container stopped successfully!', 'Container stopped'],
+  ['nginx_start', 'Start the NGINX container', ['compose', 'up', 'nginx', '-d'], '✅ NGINX container started successfully!', 'Container started in detached mode', `\n\n🌐 NGINX should be available at: ${NGINX_URL}`],
+  ['nginx_version', 'Get NGINX version information from the running container', ['compose', 'exec', 'nginx', 'nginx', '-v'], '📦 NGINX Version Information', null]
 ];
 
 serviceTools.forEach(([name, desc, command, successMsg, defaultOutput, suffix = '']) => {
@@ -510,7 +510,7 @@ server {
       return `⚠️ Certificate renewed but failed to copy to NGINX: ${copyResult.stderr}\n\n💡 You may need to manually copy the certificates.`;
     }
 
-    const reloadResult = await executeDockerCommandRobust(['compose', 'exec', 'nginx-server', 'nginx', '-s', 'reload']);
+    const reloadResult = await executeDockerCommandRobust(['compose', 'exec', 'nginx', 'nginx', '-s', 'reload']);
 
     return `✅ SSL Certificate renewed successfully!\n\n🌐 Domain: ${domain}\n🔄 Previous expiry: ${expiryDate.toISOString()}\n📅 New expiry: ${new Date(expiryDate.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString()}\n🔄 Auto-renewal: Every 60 days\n\n🕐 Renewed: ${timestamp()}\n\n💡 NGINX has been reloaded with the new certificate.`;
   }],
