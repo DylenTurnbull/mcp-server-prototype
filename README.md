@@ -235,6 +235,54 @@ Replace `<FULL_PATH_TO_PROJECT>` with your actual project directory path.
 
 1. Ask Claude: "What NGINX tools do you have available?"
 
+## 🔧 **VS Code MCP Integration**
+
+For developers using VS Code with MCP integration (such as with GitHub Copilot), you can use this NGINX MCP server directly within VS Code.
+
+### VS Code Prerequisites
+
+- **VS Code** with MCP-compatible extension (GitHub Copilot, etc.)
+- **Node.js 18+** and **Docker Desktop** (same as Claude Desktop setup)
+- **MCP Server Configuration** in your VS Code workspace
+
+### VS Code Setup
+
+#### Option 1: Using MCP Extension Settings
+
+1. Install an MCP-compatible extension in VS Code
+2. Open your workspace settings (`.vscode/settings.json`)
+3. Add the MCP server configuration:
+
+```json
+{
+  "mcp.servers": {
+    "nginx-tools": {
+      "command": "node",
+      "args": ["./src/index.js"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+```
+
+#### Option 2: Using Extension-Specific Configuration
+
+Different MCP extensions may have their own configuration methods. Check your extension's documentation for specific setup instructions.
+
+### Testing VS Code Integration
+
+1. Open this project in VS Code
+2. Ensure the NGINX container is running: `docker compose up nginx -d`
+3. Try asking your AI assistant: "Test the NGINX connectivity"
+4. Or use any of the available NGINX tools listed below
+
+### VS Code Workflow Benefits
+
+- **Integrated Development**: Manage NGINX directly from VS Code
+- **Real-time Monitoring**: Check logs and status without leaving your editor
+- **Configuration Management**: Test and reload configs during development
+- **SSL Management**: Generate and manage certificates for local development
+
 ## Manual Setup Steps
 
 If you prefer to set everything up step by step:
@@ -472,7 +520,7 @@ ls -la ssl/
 # Test SSL certificate
 openssl x509 -in ssl/selfsigned.crt -text -noout
 # Check NGINX SSL configuration
-docker exec nginx-server nginx -t
+docker compose exec nginx nginx -t
 ```
 
 ## Development
