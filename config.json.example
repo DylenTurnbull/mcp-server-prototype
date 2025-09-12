@@ -12,5 +12,10 @@
   },
   "timeouts": {
     "httpRequest": 5000
+  },
+  "vscode": {
+    "workspaceRelative": true,
+    "extensions": ["automatalabs.copilot-mcp"],
+    "mcpServerPath": "/path/to/your/mcp-server-prototype/src/index.js"
   }
 }

@@ -37,7 +37,9 @@ A **Model Context Protocol (MCP)** server that provides AI assistants with compr
 
 - [Node.js 18+](https://nodejs.org/en/download/) - Download and install the latest LTS version
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) - Required for running the NGINX container
-- [Claude Desktop](https://claude.ai/download) - The AI assistant that will use this MCP server
+- **AI Assistant Options:**
+  - [Claude Desktop](https://claude.ai/download) - Primary MCP client
+  - **OR** [VS Code](https://code.visualstudio.com/) with MCP-compatible extensions
 
 ### Installation
 
