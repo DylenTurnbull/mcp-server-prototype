@@ -109,3 +109,6 @@ ssl/
 certificates/
 certs/
 keys/
+
+.coding_standards/
+begin.md
